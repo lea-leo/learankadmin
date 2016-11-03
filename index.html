@@ -1,0 +1,559 @@
+﻿<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <title>Léa - Administration des paliers</title>
+		<style>
+			/* Coompteur de tweet*/
+			#tweetsCount {
+				display:none;
+			}
+			
+			/* Formulaire d'authentification*/
+			#auth {
+				width:100%;
+			}
+			
+			/* Tableau des paliers */
+			#ranks {
+				display:flex;
+				flex-direction:row;
+				width:100%;
+			}
+			.column {
+				display:flex;
+				flex-direction:column;
+				text-align:center;
+			}
+			.row {
+				display:flex;
+				flex-direction:row;
+			}
+			#rank_columns {
+				margin-right:5%;
+			}
+			#rank_column {
+				margin-right:5%;
+			}
+			#motion_column {
+				margin-right:5%;
+			}
+			.rank_value {
+				margin-right:5%;
+				height:90%;
+			}
+			.rank_motion {
+				margin-bottom:5px;
+			}
+			.rank_sound {
+				margin-bottom:5px;
+			}
+			.rank_value_wrapper {
+				display:flex;
+				flex-direction:row;
+				margin-bottom:5px;
+			}
+			#actions {
+				display:none;
+			}
+			
+			/* Boutons incréments/décréments */
+			#increment_decrement_wrapper {
+				margin-right:5%;
+				display:flex;
+				flex-direction:column;
+			}
+			.increment_decrement {
+				padding: 2px;
+				border: 1px solid black;
+				display:flex;
+				justify-content:center;
+			}
+			.increment_decrement:hover {
+				cursor:pointer;
+			}
+			
+			/* Compteur de tweets */
+			#count {
+				border:0;
+			}
+			
+			/* Formulaire d'authentification */
+			
+		</style>
+        <script>
+			var timerRequest = 2000;
+			var user, pwd;
+			
+			/*
+			* Permet d'envoyer une requête Ajax
+			* @param method {String} méthode HTTP
+			* @param url {String} URL du service à appeler
+			* @param requestHeaders {Array} tableau des headers de la requête de la forme [{name:"requestHeaderName", value:"requestHeaderValue"}]
+			* @param requestContent {String} body de la requête
+			* @param withAuthent indique s'il faut vérifier l'authentification d'abord
+			*/
+			function _ajax(method, url, responseHandler, requestHeaders, requestContent, withAuthent) {
+				
+				var _ajaxInternal = function(method, url, responseHandler, requestHeaders, requestContent, withAuthent) {
+					var xhr = new XMLHttpRequest();
+					xhr.open(method, url, true);
+					
+					// Headers de la requête
+					if (requestHeaders) {
+						requestHeaders.forEach(function(requestHeader) {
+							xhr.setRequestHeader(requestHeader.name, requestHeader.value);
+						});
+					}
+					
+					// Ajout des headers sécurité
+					xhr.setRequestHeader("user", user);
+					xhr.setRequestHeader("pwd", pwd);
+					
+					// Contenu de la requête
+					if (requestContent) {
+						xhr.send(requestContent);
+					} else {
+						xhr.send();
+					}
+					
+					// Handler de résultat
+					xhr.onreadystatechange = function() {
+						responseHandler(xhr);
+					};
+				}
+				
+				if (withAuthent) {
+					// Athentification demandée
+					_ajax("GET", "/auth", function(xhr) {
+						if (xhr.readyState === 4 && xhr.status === 403) {
+							alert("User/mot de passe incorrects");
+							document.getElementById("user").select();
+						} else if (xhr.readyState === 4 && xhr.status === 200) {
+							// Authentification OK
+							_ajaxInternal(method, url, responseHandler, requestHeaders, requestContent, false);
+						}
+					}, null, null, false);
+				} else {
+					// Pas d'authentification demandée
+					_ajaxInternal(method, url, responseHandler, requestHeaders, requestContent, false);
+				}
+			}
+			
+			/*
+			* Permet de contrôler que le palier saisie est un entier strictement supérieur à 0
+			* Affiche un message dans le cas contraire
+			* @param textFieldId {String} id du champ text à vérifier
+			* @return {Boolean} retourne vrai si la valeur est correcte
+			*/
+			function _controleRankValue(textFieldId) {
+				var oRankInputTextHTML = document.getElementById(textFieldId);
+				var control = new RegExp("^[0-9]+$").test(oRankInputTextHTML.value);
+				if(!control) {
+					alert("Valeur incorrecte : mauvais format saisi");
+					oRankInputTextHTML.select();
+				}
+				return control;
+			}
+			
+			/*
+			* Permet de générer la div contenant les boutons d'incréments/décréments
+			* @param textFieldId {String} id du champ text relatif aux boutons
+			* @return {Object} un objet du DOM
+			*/
+			function _generateIncrementDecrementDiv(textFieldId) {
+				var arrayJsonAttributes, arrayJsonEvents;
+				
+				// Wrapper des boutons incréments/décréments
+				arrayJsonAttributes = [{name:"id", value:"increment_decrement_wrapper"}];
+				var oIncrementDecrementDivWrapperHTML = _generateElementHTML("div", arrayJsonAttributes);
+				
+				// Bouton incrément
+				arrayJsonAttributes = [{name:"class", value:"increment_decrement"}];
+				arrayJsonEvents = [
+					{
+						type:"click",
+						handler:function() {
+							if (_controleRankValue(textFieldId)) {
+								var oRelatedTextFieldHTML = document.getElementById(textFieldId);
+								oRelatedTextFieldHTML.value = parseInt(oRelatedTextFieldHTML.value) + 1;
+							}
+						}
+					}
+				];
+				var oIncrementDivHTML = _generateElementHTML("div", arrayJsonAttributes, arrayJsonEvents, "+");
+				
+				// Bouton décrément
+				arrayJsonEvents = [
+					{
+						type:"click",
+						handler:function() {
+							if (_controleRankValue(textFieldId)) {
+								var oRelatedTextFieldHTML = document.getElementById(textFieldId);
+								var nextValue = parseInt(oRelatedTextFieldHTML.value) - 1;
+								if (nextValue >= 0) {
+									oRelatedTextFieldHTML.value = nextValue;
+								}
+							}
+						}
+					}
+				];
+				var oDecrementDivHTML = _generateElementHTML("div", arrayJsonAttributes, arrayJsonEvents, "-");
+				
+				oIncrementDecrementDivWrapperHTML.appendChild(oIncrementDivHTML);
+				oIncrementDecrementDivWrapperHTML.appendChild(oDecrementDivHTML);
+				return oIncrementDecrementDivWrapperHTML;
+			}
+			
+			/*
+			* Permet de créer une balise HTML
+			* @param tagName type de la balise HTML
+			* @param arrayJsonAttributes {Array} tableau des attributs de la balise HTML de la forme [{name:"attributeName", value:"attributeValue"}]
+			* @param arrayJsonEvents {Array} tableau des évènements de la balise HTML de la forme [{type:"typeEvenement", handler:"fonctionQuiTraiteLEvenement"}]
+			* @param html {String} innerHTML de la balise
+			* @return {Object} un objet du DOM
+			*/
+			function _generateElementHTML(tagName, arrayJsonAttributes, arrayJsonEvents, html) {
+				// Création élément HTML
+				var oElementHTML = document.createElement(tagName);
+				
+				// Création des attributs
+				if (arrayJsonAttributes) {
+					arrayJsonAttributes.forEach(function(jsonAttribute) {
+						oElementHTML.setAttribute(jsonAttribute.name, jsonAttribute.value);
+					});
+				}
+				
+				// Création des events
+				if (arrayJsonEvents) {
+					arrayJsonEvents.forEach(function(jsonEvent) {
+						oElementHTML.addEventListener(jsonEvent.type, jsonEvent.handler);
+					});
+				}
+				
+				// Contenu de l'élément
+				if (html) {
+					oElementHTML.innerHTML = html;
+				}
+				
+				return oElementHTML;
+			}
+			
+			/*
+			* Permet de générer le contenu HTML d'une liste déroulante
+			* @param optionToSelect {String} option à sélectionner
+			* @param referenceList {Array} liste des options de la liste déroulante
+			* @return {String} contenu HTML de la liste déroulante.
+			*/
+			function _generateHtmlOptionsList(optionToSelect, optionsList) {
+				var html = "";
+				if (optionsList) {
+					optionsList.forEach(function(option) {
+						html += "<option value=\""+option+"\" ";
+						if (option === optionToSelect) {
+							html += "selected";
+						}
+						html += ">"+option+"</option>";
+					});
+				} else if(optionToSelect) {
+					html = "<option value=\""+option+"\>"+option+"</option>";
+				}
+				return html;
+			}
+			
+			/*
+			* Permet de générer les listes des sons et mouvements
+			* @param jsonGamification {Json} json à parser
+			* @return {Json} les listes de forme {motions:["motion1", "motion2", "..."], sounds:["sound1", "sound2"], "..."}
+			*/
+			function _initMotionsAndSoundsLists(jsonGamification) {
+				var lists = {
+					motions:[],
+					sounds:[]
+				}
+				for (var key in jsonGamification) {
+					var motion = jsonGamification[key].motion;
+					if (motion && lists.motions.indexOf(motion) === -1) {
+						lists.motions.push(motion);
+					}
+					
+					var sound = jsonGamification[key].sound;
+					if (sound && lists.sounds.indexOf(sound) === -1) {
+						lists.sounds.push(sound);
+					}
+				}
+				
+				return lists;
+			}
+						
+			/*
+			* Permet d'afficher la liste des paliers
+			*/
+			function showRanks() {
+				_ajax("GET", "/gamification", function(xhr) {
+					if (xhr.readyState === 4 && xhr.status === 200) {
+						var jsonResponse = JSON.parse(xhr.response);
+						if (jsonResponse) {
+							var oRanksHTML = document.getElementById("ranks");
+							var idCount = 0;
+
+							// Récupération des colonnes
+							var oRankInputDivColumnHTML = document.getElementById("rank_column");
+							var oRankSelectMotionDivColumnHTML = document.getElementById("motion_column");
+							var oRankSelectSoundDivColumnHTML = document.getElementById("sound_column");
+							
+							// Init des listes des mouvements et des sons déduits du json reçu
+							var motionsAndSoundsLists = _initMotionsAndSoundsLists(jsonResponse);
+							var motionList = motionsAndSoundsLists.motions;
+							var soundList = motionsAndSoundsLists.sounds;
+							
+							// Parcours des paliers
+							for (var key in jsonResponse) {
+								// 1er élément : on vide le tableau
+								if (idCount === 0) {
+									var oRankInputDivColumnsHTML = document.getElementById("rank_columns");
+									if (oRankInputDivColumnsHTML.childNodes.length === 1) {
+										var oRankInputDivColumnHeaderHTML = _generateElementHTML("div");
+										oRankInputDivColumnsHTML.insertBefore(oRankInputDivColumnHeaderHTML, oRankInputDivColumnsHTML.firstChild);
+										oRankInputDivColumnHeaderHTML.innerHTML = "Palier";
+									}
+									oRankInputDivColumnHTML.innerHTML = "";
+									oRankSelectMotionDivColumnHTML.innerHTML = "";
+									oRankSelectSoundDivColumnHTML.innerHTML = "";
+								}
+								
+								var arrayJsonAttributes, arrayJsonEvents;
+								
+								// Création champ texte pour la saisie des paliers
+								var oRankInputTextDivWrapperHTML = _generateElementHTML("div", [{name:"class", value:"rank_value_wrapper"}]);
+								var textFieldId = "rank-value-" + idCount;
+								arrayJsonAttributes = [
+									{name:"type", value:"text"},
+									{name:"id", value:textFieldId},
+									{name:"class", value:"rank_value"},
+									{name:"size", value:"5"},
+									{name:"value", value:jsonResponse[key].rank},
+								];
+								arrayJsonEvents = [
+									{
+										type:"change",
+										handler:function() {
+											_controleRankValue(this.id);
+										}
+									}
+								];
+								var oRankInputTextHTML = _generateElementHTML("input", arrayJsonAttributes, arrayJsonEvents);
+								oRankInputTextDivWrapperHTML.appendChild(oRankInputTextHTML);
+								oRankInputDivColumnHTML.appendChild(oRankInputTextDivWrapperHTML);
+								
+								// Création boutons incréments/décréments
+								var oIncrementDecrementDivHTML = _generateIncrementDecrementDiv(textFieldId);
+								oRankInputTextDivWrapperHTML.appendChild(oIncrementDecrementDivHTML);
+								
+								// Récupération de la hauteur de ligne des boutons incréments/décréments
+								var height = oIncrementDecrementDivHTML.offsetHeight;
+								oRankInputTextDivWrapperHTML.style.height = height + "px";
+								
+								// Création liste déroulante pour les motions
+								var motion = jsonResponse[key].motion;
+								arrayJsonAttributes = [
+									{name:"id", value:"rank-motion-"+idCount},
+									{name:"class", value:"rank_motion"},
+									{name:"value", motion},
+								];
+								var oRankSelectMotionHTML = _generateElementHTML("select", arrayJsonAttributes, null, _generateHtmlOptionsList(motion, motionList));
+								oRankSelectMotionDivColumnHTML.appendChild(oRankSelectMotionHTML);
+								oRankSelectMotionHTML.style.height = height + "px";
+								
+								// Création liste déroulante pour les sons
+								var sound = jsonResponse[key].sound;
+								arrayJsonAttributes = [
+									{name:"id", value:"rank-sound-"+idCount},
+									{name:"class", value:"rank_sound"},
+									{name:"value", sound},
+								];
+								var oRankSelectSoundHTML = _generateElementHTML("select", arrayJsonAttributes, null, _generateHtmlOptionsList(sound, soundList));
+								oRankSelectSoundDivColumnHTML.appendChild(oRankSelectSoundHTML);
+								oRankSelectSoundHTML.style.height = height + "px";
+								
+								idCount++;
+							}
+							
+							if (idCount >= 1) {
+								// Il y a au moins un élément : on ajoute les en-têtes des colonnes								
+								// En-tête colonne Palier
+								var oDivRankColumnHeaderHTML = document.getElementById("rank_column_hander");
+								if (oDivRankColumnHeaderHTML) {
+									oRankInputDivColumnsHTML.removeChild(oDivRankColumnHeaderHTML);
+								}
+								var oRankInputDivColumnsHTML = document.getElementById("rank_columns");
+								oRankInputDivColumnsHTML.insertBefore(_generateElementHTML("div", [{name:"id", value:"rank_column_hander"}], null, "Palier"), oRankInputDivColumnsHTML.firstChild);
+								
+								// En-tête colonne Mouvement
+								oRankSelectMotionDivColumnHTML.insertBefore(_generateElementHTML("div", null, null, "Mouvement"), oRankSelectMotionDivColumnHTML.firstChild);
+								
+								// En-tête colonne Son
+								oRankSelectSoundDivColumnHTML.insertBefore(_generateElementHTML("div", null, null, "Son"), oRankSelectSoundDivColumnHTML.firstChild);
+								
+								// Affichage bouton
+								document.getElementById("actions").style.display = "block";
+							}
+						} else {
+							alert("Erreur lors du parsing du flux gamification : flux incorrect")
+						}
+					}
+				});
+			}
+			
+			/*
+			* Permet de d'appeler le service pour enregistrer les paliers
+			*/
+			function updateChanges() {
+				if (window.confirm("Êtes-vous sûr de vouloir modifier les paliers ?")) {
+					// Récupération de tous les champs textes
+					var jsonToPost = {};
+					var rankValidNumber = 0;
+					
+					var rankTextFields = document.querySelectorAll(".rank_value");
+					rankTextFields.forEach(function(rankTextField, index) {
+						var nextRankTextField = rankTextFields[index+1];
+						var generateJsonRan = function(rankTextFieldId, rankTextFieldValue) {
+							var splitId = rankTextFieldId.split("-");
+							var motion = document.getElementById("rank-motion-" + splitId[splitId.length-1]);
+							var sound = document.getElementById("rank-sound-" + splitId[splitId.length-1]);
+							var rank = {
+								"rank": rankTextFieldValue,
+								"motion": motion.value,
+								"sound": sound.value
+							};
+							return rank;
+						}
+						// Contrôle du champ en cours et du prochain
+						var rankTextFieldId = rankTextField.id;
+						var rankTextFieldValue = rankTextField.value;
+						if (_controleRankValue(rankTextFieldId) && nextRankTextField && _controleRankValue(nextRankTextField.id)) {
+							// Un rank doit être strictement inférieure à la prochaine ligne de rank
+							if (parseInt(rankTextFieldValue) >= parseInt(nextRankTextField.value)) {
+								alert("Valeur incorrecte : une ligne ne peut être supérieure ou égale à la prochaine ligne");
+								rankTextField.select();
+							} else {
+								jsonToPost["level_" + parseInt(index + 1)] = generateJsonRan(rankTextFieldId, rankTextFieldValue);
+								rankValidNumber++;
+							}
+						} else if (_controleRankValue(rankTextFieldId) && !nextRankTextField) {
+							// Dernier élément du tableau
+							jsonToPost["level_" + parseInt(index + 1)] = generateJsonRan(rankTextFieldId, rankTextFieldValue);
+							rankValidNumber++;
+						}
+					});
+					if (rankValidNumber === rankTextFields.length) {
+						// Enregistrement
+						_ajax("POST", "/gamification", function(xhr) {
+							if (xhr.readyState === 4 && xhr.status === 201) {
+								alert("Modifications enregistrées !");
+								showRanks();
+							} else if (xhr.readyState === 2 && xhr.status === 500) {
+								alert("Erreur lors de l'enregistrement des modifications");
+							}
+						}, [{name:"Content-type", value:"application/json"}], JSON.stringify(jsonToPost), true);
+					}
+					
+				}
+			}
+			
+			/*
+			* Permet de réinitialiser la page avec les valeurs du service
+			*/
+			function reset() {
+				if (window.confirm("Êtes-vous sûr de vouloir réinitialiser ? Toutes les données saisies seront perdues")) {
+					showRanks();
+				}
+			}
+			
+			/*
+			* Permet de charger les paliers et de lancer l'affichage du compteur de tweets
+			*/
+			function start() {
+				user = document.getElementById("user").value;
+				pwd = document.getElementById("pwd").value;
+				
+				// Vérification authentification
+				_ajax("GET", "/auth", function(xhr) {
+					if (xhr.readyState === 4 && xhr.status === 200) {
+						/*
+						* Permet de mettre à jour le nombre de tweets
+						* Fonction récursive qui s'éxécute tous X millosecondes (X étant la valeur de la variable timerRequest)
+						*/
+						var updateTweets = function () {
+							_ajax("GET", "/tweets/count", function(xhr) {
+								if (xhr.readyState === 4 && xhr.status === 200) {
+									document.getElementById("tweetsCount").style.display = "block";
+									var jsonResponse = JSON.parse(xhr.response);
+									if (jsonResponse && jsonResponse.count !== undefined && jsonResponse.count !== null) {
+										document.getElementById("count").value = jsonResponse.count;
+									}
+									setTimeout(function(){ updateTweets() }, timerRequest);
+								}
+							});
+						}
+						
+						updateTweets();
+						showRanks();
+						document.getElementById("timer").innerHTML = parseInt(timerRequest) / 1000;
+						
+						var oFormAuthent = document.getElementById("auth");
+						oFormAuthent.parentNode.removeChild(oFormAuthent);
+					}
+				}, null, null, true);
+			}
+			
+			/*
+			* Appel start quand l'utilsateur tape entrée dans le formulaire d'authentification
+			*/
+			function callStart(event) {
+				if (event.keyCode === 13) {
+					start();
+				}
+			}
+			
+		</script>
+    </head>
+
+    <body>
+		<h3>Léa - Administration des paliers</h3>
+		<div id="tweetsCount">
+			<p>Nombre de tweets sur @devfest_lea : <input type="text" size="5" readonly id="count" value="-"/> (mis à jour toutes les <span id="timer">-</span> secondes)</p>
+		</div>
+		
+		<div class="row">
+			<div id="auth">
+				<h4>Authentification</h4>
+				<p>
+					Utilisateur : <input type="text" id="user" value="" onkeydown="javascript:callStart(event);" />
+				</p>
+				<p>
+					Mot de passe : <input type="password" id="pwd" value="" onkeydown="javascript:callStart(event);"/>
+				</p>
+				<p>
+					<input type="button" id="validateAuthent" value="Valider" onclick="javascript:start();"/>
+				</p>
+			</div>
+			<div id="ranks">
+				<div id="rank_columns" class="column">
+					<div id="rank_column" class="column">
+					</div>
+				</div>
+				<div id="motion_column" class="column"></div>
+				<div id="sound_column" class="column"></div>
+			</div>
+		</div>
+		
+		<div id="actions">
+			<p>
+				<input type="button" id="validate" value="Valider les changements" onclick="javascript:updateChanges();"/>
+				<input type="button" id="validate" value="Réinitialiser" onclick="javascript:reset();"/>
+			</p>
+		</div>
+    </body>
+</html>

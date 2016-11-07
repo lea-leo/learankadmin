@@ -56,10 +56,16 @@ function _endResponse(res, response) {
 
 /*
 * Permet de lire un fichier
+* @param fileName {String} Nom du fichier
+* @param withPath {Boolean} indique s'il faut aller le chercher le fichier avec le path 
 * @return {Object} le résultat de readFileSync de Node
 */
-function _internalReadFileSync(fileName) {
-	return fs.readFileSync(path + fileName);
+function _internalReadFileSync(fileName, withPath) {
+	var filePath = fileName;
+	if (withPath) {
+		filePath = path + fileName;
+	}
+	return fs.readFileSync(filePath);
 }
 
 /*
@@ -78,10 +84,10 @@ http.createServer(options, function(req, res) {
 	if (publicRessources.indexOf(httpRequest) !== -1 || checkAuthent) {
 		switch (httpRequest) {
 			case "GET /":
-				response = _createResponse(200, "text/html", _internalReadFileSync('index.html'));
+				response = _createResponse(200, "text/html", _internalReadFileSync('index.html', false));
 				break;
 			case "GET /index.html":
-				response = _createResponse(200, "text/html", _internalReadFileSync('index.html'));
+				response = _createResponse(200, "text/html", _internalReadFileSync('index.html', false));
 				break;
 			case "GET /auth":
 				if (checkAuthent) {
@@ -92,7 +98,7 @@ http.createServer(options, function(req, res) {
 				break;
 			case "GET /gamification":
 				try {
-					var gamification = _internalReadFileSync('gamification.json');
+					var gamification = _internalReadFileSync('gamification.json', true);
 					var gamificationJson = JSON.parse(gamification);
 					response = _createResponse(200, "application/json", JSON.stringify(gamificationJson));
 				} catch (error) {
@@ -136,18 +142,9 @@ http.createServer(options, function(req, res) {
 					_endResponse(res, response);
 				}
 				break;
-			case "GET /gamification/motions_sounds":
-				try {
-					var motionsAndSounds = _internalReadFileSync('motions_sounds.json');
-					var motionsAndSoundsJson = JSON.parse(motionsAndSounds);
-					response = _createResponse(200, "application/json", "{}", JSON.stringify(motionsAndSoundsJson));
-				} catch (error) {
-					response = _createResponse(404, "text/html", "Resource not found")
-				}
-				break;
 			case "GET /tweets/count":
 				try {
-					var tweets = _internalReadFileSync('tweets.json');
+					var tweets = _internalReadFileSync('tweets.json', true);
 					count = JSON.parse(tweets).length;
 				} catch (error) {
 					response = _createResponse(200, "application/json", "{\"count\":"+count+"}");

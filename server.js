@@ -18,6 +18,8 @@ process.argv.forEach(function (val, index) {
 		userAdmin = val;
 	} else if  (index === 3) {
 		pwdAdmin = val;
+	} else if  (index === 4) {
+		path = val;
 	}
 });
 
